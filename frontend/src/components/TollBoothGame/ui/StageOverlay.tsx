@@ -28,7 +28,7 @@ export default function StageOverlay({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.4 }}
-      className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4"
+      className="absolute top-24 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4"
     >
       <div className="bg-gray-900/90 border border-gray-800 backdrop-blur-md rounded-2xl p-6 shadow-2xl">
         {/* Stage number */}

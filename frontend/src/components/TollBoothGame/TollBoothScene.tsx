@@ -41,8 +41,8 @@ export default function TollBoothScene({ gameState }: Props) {
       />
 
       {/* Environment */}
-      <color attach="background" args={['#000000']} />
-      <fog attach="fog" args={['#000000', 15, 35]} />
+      <color attach="background" args={['#1a1a1a']} />
+      <fog attach="fog" args={['#1a1a1a', 15, 35]} />
 
       {/* Ground plane for shadows */}
       <mesh
