@@ -1,7 +1,7 @@
 {
   "name": "mev-listener",
   "version": "1.0.0",
-  "description": "Mempool listener for MEV Weather",
+  "description": "Mempool listener - Real-time trading conditions monitor",
   "homepage": "https://github.com/alessandrofelici/spartahack-11#readme",
   "bugs": {
     "url": "https://github.com/alessandrofelici/spartahack-11/issues"
