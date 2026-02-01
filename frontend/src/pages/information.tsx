@@ -7,7 +7,7 @@ const InfoCard = ({ title, delay, children }: { title: string, delay: number, ch
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5, delay }}
-    className="bg-gray-900/40 border border-gray-800 p-6 rounded-3xl backdrop-blur-sm hover:border-emerald-500/30 transition-colors duration-300"
+    className="bg-gray-800/50 border border-gray-700 p-6 rounded-3xl backdrop-blur-sm hover:border-emerald-500/30 transition-colors duration-300"
   >
     <h3 className="text-emerald-400 text-xs font-bold uppercase tracking-widest mb-4 border-b border-gray-800 pb-2">
       {`// ${title}`}
@@ -20,15 +20,14 @@ const InfoCard = ({ title, delay, children }: { title: string, delay: number, ch
 
 export default function Information() {
   return (
-    <div className="bg-black text-white font-mono selection:bg-emerald-500/30 overflow-x-hidden">
+    <div className="bg-[#0a0a0a] text-white font-mono selection:bg-emerald-500/30 overflow-x-hidden">
       {/* Interactive Sandwich Attack Game */}
       <TollBoothGame />
 
       {/* Info Content Section */}
-      <div id="info-content" className="min-h-screen relative">
+      <div id="info-content" className="snap-section min-h-screen relative" style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always', marginTop: '-1rem', paddingTop: '3rem' }}>
         {/* Background Effects */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(16,185,129,0.1),transparent_50%)]" />
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20" />
         </div>
 

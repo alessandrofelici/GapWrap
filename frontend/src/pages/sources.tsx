@@ -265,6 +265,17 @@ export default function Sources() {
                       {protection.protectionLevel}
                     </span>
                   </div>
+
+                  <div className="bg-gray-900/50 border border-gray-800 rounded p-3 mt-3">
+                    <p className="text-[10px] text-gray-400 leading-relaxed mb-2">
+                      <span className="text-emerald-400 font-bold">How is this calculated?</span>
+                    </p>
+                    <div className="space-y-1 text-[10px] text-gray-500">
+                      <div>• <span className="text-emerald-400">HIGH</span>: Slippage &lt; 0.5%</div>
+                      <div>• <span className="text-yellow-400">MEDIUM</span>: Slippage 0.5% - 1.5%</div>
+                      <div>• <span className="text-red-400">LOW</span>: Slippage &gt; 1.5%</div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-emerald-900/10 border border-emerald-500/20 rounded p-3 mt-4">
@@ -345,19 +356,9 @@ export default function Sources() {
               </div>
             </InfoCard>
 
-            <InfoCard title="Stay Informed" delay={0.7}>
-              <p>
-                Follow security researchers, audit reports, and official announcements from your 
-                preferred protocols to stay updated on new vulnerabilities and protection methods.
-              </p>
-              <div className="mt-4 flex gap-2 flex-wrap">
-                <span className="px-2 py-1 bg-blue-900/30 border border-blue-900/50 rounded text-[10px] text-blue-400">TWITTER</span>
-                <span className="px-2 py-1 bg-purple-900/30 border border-purple-900/50 rounded text-[10px] text-purple-400">DISCORD</span>
-                <span className="px-2 py-1 bg-red-900/30 border border-red-900/50 rounded text-[10px] text-red-400">NEWSLETTERS</span>
-              </div>
-            </InfoCard>
 
-            <InfoCard title="Monitor Gas Prices" delay={0.8}>
+
+            <InfoCard title="Monitor Gas Prices" delay={0.7}>
               <p>
                 High gas prices often correlate with increased MEV activity. Consider waiting for 
                 lower gas periods or use gas price alerts to time your transactions better.
@@ -375,6 +376,14 @@ export default function Sources() {
                   <span className="text-gray-500">High:</span>
                   <span className="text-red-400">&gt; 100 GWEI</span>
                 </div>
+              </div>
+              <div className="mt-3 p-2 bg-emerald-900/10 border border-emerald-500/20 rounded">
+                <p className="text-[10px] text-emerald-400 mb-1">⏰ Best Trading Times (Your Timezone):</p>
+                <p className="text-[10px] text-gray-400 leading-relaxed">
+                  Typically lowest gas: 2:00 AM - 6:00 AM {new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').slice(-1)[0]}
+                  <br />
+                  Weekend mornings often have 30-50% lower fees.
+                </p>
               </div>
             </InfoCard>
           </div>
