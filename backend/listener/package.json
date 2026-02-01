@@ -18,7 +18,11 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node tests/decoder.test.js",
+    "test": "npm run test:config && npm run test:constants && npm run test:decoder",
+    "test:config": "node tests/config.test.js",
+    "test:constants": "node tests/constants.test.js",
+    "test:decoder": "node tests/decoder.test.js",
+    "test:listener": "node tests/listener.test.js",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "lint": "eslint src/"
