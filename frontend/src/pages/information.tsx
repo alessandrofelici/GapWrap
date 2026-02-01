@@ -1,4 +1,3 @@
-
 import { motion } from "framer-motion";
 import TollBoothGame from "../components/TollBoothGame";
 
