@@ -1,186 +1,231 @@
-// Main entry point for MEV Weather listener service
+// ============================================================
+// src/index.js
+// Main entry point - initializes and connects all components
+// ============================================================
 
 const { config, logConfig } = require('./config');
 const mempoolListener = require('./mempool-listener');
 const pairAggregator = require('./pair-aggregator');
-const websocketServer = require('./websocket-server');
+const webSocketServer = require('./websocket-server');
+const demoMode = require('./demo-mode');
 
+// --------------------------------------------------
 // Application state
+// --------------------------------------------------
 let isShuttingDown = false;
-let startTime = null;
 
+// --------------------------------------------------
 // Main initialization function
+// --------------------------------------------------
 async function main() {
   console.log('\n╔═══════════════════════════════════════════════════════════╗');
   console.log('║                                                           ║');
-  console.log('║                    Project                            ║');
-  console.log('║            Real-Time Trading Conditions                   ║');
+  console.log('║              🌦️  MEV WEATHER - LISTENER SERVICE           ║');
+  console.log('║                                                           ║');
+  console.log('║          Real-time Mempool Monitoring & Analysis          ║');
   console.log('║                                                           ║');
   console.log('╚═══════════════════════════════════════════════════════════╝\n');
   
-  // Log configuration
+  // Log configuration (with sensitive data masked)
   logConfig();
   
-  console.log(' Starting Project...\n');
-  
-  startTime = Date.now();
-  
-  // Step 1: Initialize pair aggregator
-  // This initializes the sandwich detector internally
-  console.log('Step 1: Initializing pair aggregator...');
-  pairAggregator.initialize(
-    handlePairUpdate,      // Called when pair stats update
-    handleSandwichAlert    // Called when sandwich detected
-  );
-  
-  // Step 2: Initialize WebSocket server
-  console.log('Step 2: Initializing WebSocket server...');
-  websocketServer.initialize(pairAggregator);
-  
-  // Step 3: Initialize mempool listener
-  // This starts receiving real-time transactions
-  console.log('Step 3: Initializing mempool listener...');
-  await mempoolListener.initialize(handleTransaction);
-  
-  // Startup complete
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  
-  console.log('\n╔═══════════════════════════════════════════════════════════╗');
-  console.log('║                                                           ║');
-  console.log(`║     Project IS RUNNING                             ║`);
-  console.log('║                                                           ║');
-  console.log(`║     Started in ${elapsed} seconds                                  ║`);
-  console.log(`║     WebSocket: ws://localhost:${config.server.port}                    ║`);
-  console.log(`║     HTTP API:  http://localhost:${config.server.port}                  ║`);
-  console.log('║                                                           ║');
-  console.log('║     Press Ctrl+C to stop                                  ║');
-  console.log('║                                                           ║');
-  console.log('╚═══════════════════════════════════════════════════════════╝\n');
-  
-  // Display monitoring info periodically
-  if (config.logging.level === 'debug') {
-    setInterval(displayStatus, 30000); // Every 30 seconds
+  try {
+    // --------------------------------------------------
+    // Step 1: Initialize Pair Aggregator
+    // Must be first - it receives transactions from listener/demo
+    // and sends updates to WebSocket server
+    // --------------------------------------------------
+    console.log('📊 Step 1/4: Initializing pair aggregator...');
+    pairAggregator.initialize(
+      // Callback: When pair stats update, broadcast to WebSocket clients
+      (pairStats) => {
+        webSocketServer.broadcastPairUpdate(pairStats);
+      },
+      // Callback: When sandwich detected, broadcast alert
+      (sandwich) => {
+        webSocketServer.broadcastSandwichAlert(sandwich);
+      }
+    );
+    
+    // --------------------------------------------------
+    // Step 2: Initialize WebSocket Server
+    // Needs aggregator reference for HTTP API endpoints
+    // --------------------------------------------------
+    console.log('🌐 Step 2/4: Initializing WebSocket server...');
+    webSocketServer.initialize(pairAggregator);
+    
+    // --------------------------------------------------
+    // Step 3: Initialize Data Source (Live or Demo)
+    // --------------------------------------------------
+    if (config.features.demoMode) {
+      // Demo Mode: Use pre-recorded data
+      console.log('🎬 Step 3/4: Initializing demo mode...');
+      
+      const hasScenarios = demoMode.initialize(
+        // Callback: Feed demo transactions to aggregator
+        (tx) => {
+          pairAggregator.processTransaction(tx);
+        }
+      );
+      
+      if (hasScenarios) {
+        // List available scenarios
+        const scenarios = demoMode.listScenarios();
+        console.log('\n   Available demo scenarios:');
+        scenarios.forEach((s, i) => {
+          console.log(`   ${i + 1}. ${s.name} (${s.displayName})`);
+          console.log(`      └─ ${s.description}`);
+          console.log(`      └─ Pair: ${s.pair}, Txs: ${s.transactionCount}, Duration: ${s.duration}s`);
+        });
+        
+        // Auto-start first scenario
+        console.log('\n   Starting first scenario automatically...');
+        demoMode.play();
+      } else {
+        console.log('   ⚠️  No demo scenarios found. Create JSON files in demo-data/');
+      }
+      
+    } else {
+      // Live Mode: Connect to Ethereum mempool
+      console.log('🔌 Step 3/4: Initializing mempool listener (live mode)...');
+      
+      await mempoolListener.initialize(
+        // Callback: Send decoded transactions to aggregator
+        (tx) => {
+          pairAggregator.processTransaction(tx);
+        }
+      );
+    }
+    
+    // --------------------------------------------------
+    // Step 4: Setup complete
+    // --------------------------------------------------
+    console.log('\n✅ Step 4/4: All systems initialized!\n');
+    
+    // Print status summary
+    printStatusSummary();
+    
+    // Broadcast initial pairs list to any connected clients
+    setTimeout(() => {
+      webSocketServer.broadcastPairsList();
+    }, 1000);
+    
+  } catch (error) {
+    console.error('\n❌ Initialization failed:', error.message);
+    console.error(error.stack);
+    process.exit(1);
   }
 }
 
-// Handle incoming transaction from mempool listener
-function handleTransaction(decodedTx) {
-  // Pass to pair aggregator for processing
-  pairAggregator.processTransaction(decodedTx);
-}
-
-// Handle pair update from aggregator
-function handlePairUpdate(stats) {
-  // Broadcast to WebSocket clients
-  websocketServer.broadcastPairUpdate(stats);
-}
-
-// Handle sandwich alert from aggregator
-function handleSandwichAlert(sandwich) {
-  // Broadcast to WebSocket clients
-  websocketServer.broadcastSandwichAlert(sandwich);
-}
-
-// Display current status (debug mode only)
-function displayStatus() {
-  const uptime = Math.floor((Date.now() - startTime) / 1000);
+// --------------------------------------------------
+// Print status summary
+// --------------------------------------------------
+function printStatusSummary() {
+  const mode = config.features.demoMode ? 'DEMO' : 'LIVE';
+  const modeEmoji = config.features.demoMode ? '🎬' : '📡';
   
-  const mempoolStats = mempoolListener.getStats();
-  const aggregatorStats = pairAggregator.getGlobalStats();
-  const serverStats = websocketServer.getServerStats();
-  
-  console.log('\n╔═══════════════════════════════════════════════════════════╗');
-  console.log('║                    STATUS UPDATE                          ║');
+  console.log('╔═══════════════════════════════════════════════════════════╗');
+  console.log('║                    SERVICE STATUS                         ║');
   console.log('╠═══════════════════════════════════════════════════════════╣');
-  console.log(`║  Uptime:              ${uptime}s                              ║`);
-  console.log(`║  Connected to Alchemy: ${mempoolStats.connected ? 'Connected' : 'Not Connected'}                               ║`);
-  console.log(`║  Transactions seen:    ${mempoolStats.totalTransactionsReceived}                           ║`);
-  console.log(`║  Transactions decoded: ${mempoolStats.totalTransactionsDecoded}                           ║`);
-  console.log(`║  Sandwiches detected:  ${aggregatorStats.total_sandwiches_detected}                            ║`);
-  console.log(`║  Active pairs:         ${aggregatorStats.active_pairs}                             ║`);
-  console.log(`║  WebSocket clients:    ${serverStats.currentConnections}                             ║`);
-  console.log('╚═══════════════════════════════════════════════════════════╝\n');
+  console.log(`║  Mode:           ${modeEmoji} ${mode.padEnd(38)}║`);
+  console.log(`║  WebSocket:      🌐 ws://localhost:${config.server.port}                    ║`);
+  console.log(`║  HTTP API:       🔗 http://localhost:${config.server.port}                  ║`);
+  console.log(`║  Frontend CORS:  ✅ ${config.server.frontendUrl.padEnd(36)}║`);
+  console.log('╠═══════════════════════════════════════════════════════════╣');
+  console.log('║  API Endpoints:                                           ║');
+  console.log('║    GET /health           - Health check                   ║');
+  console.log('║    GET /api/pairs        - List active pairs              ║');
+  console.log('║    GET /api/pairs/:pair  - Stats for pair (Role 2 API)   ║');
+  console.log('║    GET /api/stats        - Global statistics              ║');
+  console.log('╠═══════════════════════════════════════════════════════════╣');
+  console.log('║  WebSocket Events:                                        ║');
+  console.log('║    → subscribe { pair }  - Subscribe to pair updates      ║');
+  console.log('║    → unsubscribe { pair }- Unsubscribe from pair          ║');
+  console.log('║    ← pair_update         - Pair statistics update         ║');
+  console.log('║    ← sandwich_alert      - Sandwich attack detected       ║');
+  console.log('╚═══════════════════════════════════════════════════════════╝');
+  console.log('');
+  console.log('Press Ctrl+C to stop the service.\n');
 }
 
+// --------------------------------------------------
 // Graceful shutdown handler
+// --------------------------------------------------
 async function shutdown(signal) {
-  // Prevent multiple shutdown calls
   if (isShuttingDown) {
+    console.log('\n   Shutdown already in progress...');
     return;
   }
   
   isShuttingDown = true;
   
-  console.log(`\n\n Received ${signal} - shutting down gracefully...`);
-  console.log('╔═══════════════════════════════════════════════════════════╗');
-  console.log('║                     SHUTTING DOWN                         ║');
-  console.log('╚═══════════════════════════════════════════════════════════╝\n');
-  
-  // Calculate final stats
-  const finalUptime = Math.floor((Date.now() - startTime) / 1000);
-  const mempoolStats = mempoolListener.getStats();
-  const aggregatorStats = pairAggregator.getGlobalStats();
-  
-  // Display final statistics
-  console.log(' Final Statistics:');
-  console.log(`   Runtime:              ${finalUptime} seconds`);
-  console.log(`   Transactions received: ${mempoolStats.totalTransactionsReceived}`);
-  console.log(`   Transactions decoded:  ${mempoolStats.totalTransactionsDecoded}`);
-  console.log(`   Sandwiches detected:   ${aggregatorStats.total_sandwiches_detected}`);
-  console.log(`   Peak active pairs:     ${aggregatorStats.active_pairs}\n`);
+  console.log(`\n\n🛑 Received ${signal}. Shutting down gracefully...\n`);
   
   try {
-    // Shutdown components in reverse order
-    console.log('Shutting down components...');
+    // Shutdown in reverse order of initialization
     
-    // 1. Stop receiving new transactions
-    console.log('   1/3 Stopping mempool listener...');
-    await mempoolListener.shutdown();
+    // 1. Stop data source
+    if (config.features.demoMode) {
+      console.log('   Stopping demo mode...');
+      demoMode.shutdown();
+    } else {
+      console.log('   Stopping mempool listener...');
+      await mempoolListener.shutdown();
+    }
     
-    // 2. Stop WebSocket server (notify clients)
-    console.log('   2/3 Stopping WebSocket server...');
-    await websocketServer.shutdown();
-    
-    // 3. Clean up aggregator
-    console.log('   3/3 Stopping pair aggregator...');
+    // 2. Stop pair aggregator
+    console.log('   Stopping pair aggregator...');
     pairAggregator.shutdown();
     
-    console.log('\n Shutdown complete. Goodbye!\n');
+    // 3. Stop WebSocket server
+    console.log('   Stopping WebSocket server...');
+    await webSocketServer.shutdown();
     
-    // Exit cleanly
+    // Print final stats
+    console.log('\n📊 Final Statistics:');
+    const globalStats = pairAggregator.getGlobalStats();
+    console.log(`   Total transactions processed: ${globalStats.total_transactions_processed}`);
+    console.log(`   Total sandwiches detected: ${globalStats.total_sandwiches_detected}`);
+    console.log(`   Active pairs tracked: ${globalStats.active_pairs}`);
+    
+    const serverStats = webSocketServer.getServerStats();
+    console.log(`   Total WebSocket connections: ${serverStats.totalConnections}`);
+    console.log(`   Total pair updates sent: ${serverStats.totalPairUpdates}`);
+    console.log(`   Total sandwich alerts sent: ${serverStats.totalSandwichAlerts}`);
+    
+    console.log('\n✅ Shutdown complete. Goodbye!\n');
     process.exit(0);
     
   } catch (error) {
-    console.error(`\n Error during shutdown: ${error.message}`);
-    console.error('   Forcing exit...\n');
+    console.error('\n❌ Error during shutdown:', error.message);
     process.exit(1);
   }
 }
 
-// Error handlers
+// --------------------------------------------------
+// Setup signal handlers
+// --------------------------------------------------
+process.on('SIGINT', () => shutdown('SIGINT'));   // Ctrl+C
+process.on('SIGTERM', () => shutdown('SIGTERM')); // Docker/K8s stop
+
+// Handle uncaught errors
 process.on('uncaughtException', (error) => {
-  console.error('\n UNCAUGHT EXCEPTION:');
-  console.error(error);
-  console.error('\nShutting down due to uncaught exception...\n');
-  shutdown('UNCAUGHT_EXCEPTION');
+  console.error('\n❌ Uncaught Exception:', error.message);
+  console.error(error.stack);
+  shutdown('uncaughtException');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('\n UNHANDLED REJECTION:');
-  console.error('Promise:', promise);
+  console.error('\n❌ Unhandled Rejection at:', promise);
   console.error('Reason:', reason);
-  console.error('\nShutting down due to unhandled rejection...\n');
-  shutdown('UNHANDLED_REJECTION');
+  shutdown('unhandledRejection');
 });
 
-// Shutdown signal handlers
-process.on('SIGINT', () => shutdown('SIGINT'));   // Ctrl+C
-process.on('SIGTERM', () => shutdown('SIGTERM')); // Kill command
-
+// --------------------------------------------------
 // Start the application
+// --------------------------------------------------
 main().catch((error) => {
-  console.error('\n FATAL ERROR during startup:');
-  console.error(error);
-  console.error('\nApplication failed to start.\n');
+  console.error('\n❌ Fatal error:', error.message);
+  console.error(error.stack);
   process.exit(1);
 });

@@ -141,6 +141,119 @@ function setupHttpRoutes() {
       aggregator: globalStats
     });
   });
+
+  // Get list of available scenarios
+  app.get('/api/demo/scenarios', (req, res) => {
+    if (!config.features.demoMode) {
+      return res.status(400).json({ error: 'Demo mode not enabled' });
+    }
+    
+    const demoMode = require('./demo-mode');
+    const scenarios = demoMode.listScenarios();
+
+    res.json({
+      count: scenarios.length,
+      scenarios: scenarios
+    });
+  });
+
+  // Get current scenario info
+  app.get('/api/demo/current', (req, res) => {
+    if (!config.features.demoMode) {
+      return res.status(400).json({ error: 'Demo mode not enabled' });
+    }
+
+    const demoMode = require('./demo-mode');
+    const current = demoMode.getCurrentScenario();
+
+    if (!current) {
+      return res.json({ playing: false, scenario: null });
+    }
+
+    res.json({
+      playing: true,
+      scenario: current
+    });
+  });
+
+  // Switch to a scenario
+app.post('/api/demo/switch', (req, res) => {
+  if (!config.features.demoMode) {
+    return res.status(400).json({ error: 'Demo mode not enabled' });
+  }
+  
+  const { scenario } = req.body;
+  
+  if (!scenario) {
+    return res.status(400).json({ error: 'Missing scenario name' });
+  }
+  
+  const demoMode = require('./demo-mode');
+  const success = demoMode.switchScenario(scenario);
+  
+  if (success) {
+    res.json({ 
+      success: true, 
+      message: `Switched to ${scenario}`,
+      current: demoMode.getCurrentScenario()
+    });
+  } else {
+    res.status(404).json({ error: 'Scenario not found' });
+  }
+});
+
+  // Playback controls
+  app.post('/api/demo/play', (req, res) => {
+    if (!config.features.demoMode) {
+      return res.status(400).json({ error: 'Demo mode not enabled' });
+    }
+  
+    const demoMode = require('./demo-mode');
+    const { scenario } = req.body;
+  
+    const success = scenario ? demoMode.play(scenario) : demoMode.resume();
+  
+    res.json({ success, current: demoMode.getCurrentScenario() });
+  });
+
+  app.post('/api/demo/pause', (req, res) => {
+    if (!config.features.demoMode) {
+      return res.status(400).json({ error: 'Demo mode not enabled' });
+    }
+  
+    const demoMode = require('./demo-mode');
+    const success = demoMode.pause();
+  
+    res.json({ success, current: demoMode.getCurrentScenario() });
+  });
+
+  app.post('/api/demo/stop', (req, res) => {
+    if (!config.features.demoMode) {
+      return res.status(400).json({ error: 'Demo mode not enabled' });
+    }
+  
+    const demoMode = require('./demo-mode');
+    const success = demoMode.stop();
+  
+    res.json({ success, current: demoMode.getCurrentScenario() });
+  });
+
+  app.post('/api/demo/speed', (req, res) => {
+    if (!config.features.demoMode) {
+      return res.status(400).json({ error: 'Demo mode not enabled' });
+    }
+  
+    const { speed } = req.body;
+  
+    if (typeof speed !== 'number' || speed <= 0) {
+      return res.status(400).json({ error: 'Invalid speed value' });
+    }
+  
+    const demoMode = require('./demo-mode');
+    const success = demoMode.setSpeed(speed);
+  
+    res.json({ success, speed, current: demoMode.getCurrentScenario() });
+  });
   
   // 404 handler
   app.use((req, res) => {
@@ -184,6 +297,67 @@ function setupSocketHandlers() {
     // Handle errors
     socket.on('error', (error) => {
       console.error(`    Socket error (${socket.id}): ${error.message}`);
+    });
+
+    
+    // Demo control events
+    socket.on('demo_get_scenarios', () => {
+      if (!config.features.demoMode) {
+        socket.emit('error', { message: 'Demo mode not enabled' });
+        return;
+      }
+  
+      const demoMode = require('./demo-mode');
+      const scenarios = demoMode.listScenarios();
+  
+      socket.emit('demo_scenarios', {
+        count: scenarios.length,
+        scenarios: scenarios
+      });
+    });
+
+    socket.on('demo_switch', (data) => {
+      if (!config.features.demoMode) {
+        socket.emit('error', { message: 'Demo mode not enabled' });
+        return;
+      }
+  
+      if (!data || !data.scenario) {
+        socket.emit('error', { message: 'Missing scenario name' });
+        return;
+      }
+  
+      const demoMode = require('./demo-mode');
+      const success = demoMode.switchScenario(data.scenario);
+  
+      // Broadcast to all clients that scenario changed
+      io.emit('demo_scenario_changed', {
+        scenario: data.scenario,
+        current: demoMode.getCurrentScenario()
+      });
+    });
+
+    socket.on('demo_play', () => {
+      const demoMode = require('./demo-mode');
+      demoMode.resume();
+      io.emit('demo_playback_changed', { state: 'playing' });
+    });
+
+    socket.on('demo_pause', () => {
+      const demoMode = require('./demo-mode');
+      demoMode.pause();
+      io.emit('demo_playback_changed', { state: 'paused' });
+    });
+
+    socket.on('demo_set_speed', (data) => {
+      if (!data || typeof data.speed !== 'number') {
+        socket.emit('error', { message: 'Invalid speed value' });
+        return;
+      }
+  
+      const demoMode = require('./demo-mode');
+      demoMode.setSpeed(data.speed);
+      io.emit('demo_speed_changed', { speed: data.speed });
     });
   });
 }
