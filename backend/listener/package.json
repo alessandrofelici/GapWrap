@@ -23,6 +23,8 @@
     "test:constants": "node tests/constants.test.js",
     "test:decoder": "node tests/decoder.test.js",
     "test:listener": "node tests/listener.test.js",
+    "test:aggregator": "node tests/pair-aggregator.test.js",
+    "test:detector": "node tests/sandwich-detector.test.js",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "lint": "eslint src/"
